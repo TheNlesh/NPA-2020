@@ -29,7 +29,7 @@ class Router:
 		bin_dst += '0' * remainder
 
 		# Slice binary address every 8 indices for group and convert into decimal
-		dec_dst = re.findall('.'*8, bin_dst)
+		dec_dst = re.findall('.' * 8, bin_dst)
 
 		# Convert binary address to decimal
 		dst = [str(int(dec, 2)) for dec in dec_dst]
@@ -79,6 +79,7 @@ class Router:
 	def connect(self, local_int, remote_host, remote_int):
 		local_int_exist = local_int in self.getInterfaces()
 		remote_int_exist = remote_int in remote_host.getInterfaces()
+
 		local_int_not_connected = local_int not in self.connection
 		remote_int_not_connected = remote_int not in remote_host.connection
 
@@ -89,8 +90,24 @@ class Router:
 		return False
 
 	def disconnect(self, local_int, remote_host, remote_int):
-		del self.connection[local_int]
-		del remote_host.connection[remote_int]
+		local_int_exist = local_int in self.getInterfaces()
+		remote_int_exist = remote_int in remote_host.getInterfaces()
+		local_int_connected = local_int in self.connection
+		remote_int_connected = remote_int in remote_host.connection
+
+		# Check the interface that need for disconnect is existing and already connected
+		if not (local_int_exist and remote_int_exist and local_int_connected and remote_int_connected):
+			return  False
+
+		local_int_connect_to_remote_int = [remote_host.getHostname(), remote_int] == self.connection[local_int]
+		remote_int_connect_to_local_int = [self.getHostname(), local_int] == remote_host.connection[remote_int]
+
+		# Check connectivity between 2 interfaces
+		if local_int_exist and remote_int_exist and local_int_connect_to_remote_int and remote_int_connect_to_local_int:
+			del self.connection[local_int]
+			del remote_host.connection[remote_int]
+			return True
+		return False
 
 	# Addressing
 	def setIP(self, interfaceName, ip):

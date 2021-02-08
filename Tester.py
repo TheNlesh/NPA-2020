@@ -23,17 +23,23 @@ class TestRouter(unittest.TestCase):
 		# Add duplicate interface
 		self.assertFalse(rt1.addInterface("G0/0"))
 
-		# New interface
+		# Add new interface
 		self.assertTrue(rt1.addInterface("G0/1"))
 		self.assertTrue(rt1.addInterface("G0/3"))
 
-		# Show interface that router have
+		# Check that the interface successfully added
+		self.assertIn("G0/0", rt1.getInterfaces())
+		self.assertIn("G0/1", rt1.getInterfaces())
+		self.assertIn("G0/3", rt1.getInterfaces())
+
+		# Show interface that the router have
 		self.assertDictEqual(rt1.getInterfaces(), {'G0/0': 'unassigned IP', 'G0/1': 'unassigned IP', 'G0/3': 'unassigned IP'})
 
-		# Delete interface
+		# Delete interface and check
 		self.assertTrue(rt1.deleteInterface("G0/3"))
+		self.assertNotIn("G0/3", rt1.getInterfaces())
 
-		# Delete inteface doesn't exist
+		# Delete interface doesn't exist
 		self.assertFalse(rt1.deleteInterface("G0/3"))
 
 		# Show interface that router have
@@ -74,12 +80,40 @@ class TestRouter(unittest.TestCase):
 		#            \          /
 		#             \        /
 		#              \      /
-		#           (G0/5) (G0/4)
-		#                \ /
+		#           (G0/5)  (G0/4)
+		#                \  /
 		#                 R3
 
-		# Connect to interface that was connected
+		self.assertIn("G0/0", rt1.connection)
+		self.assertIn("G0/1", rt1.connection)
+
+		self.assertIn("G0/2", rt2.connection)
+		self.assertIn("G0/3", rt2.connection)
+
+		self.assertIn("G0/4", rt3.connection)
+		self.assertIn("G0/5", rt3.connection)
+
+		self.assertDictEqual(rt1.connection, {'G0/1': ['R2', 'G0/2'], 'G0/0': ['R3', 'G0/5']})
+		self.assertDictEqual(rt2.connection, {'G0/2': ['R1', 'G0/1'], 'G0/3': ['R3', 'G0/4']})
+		self.assertDictEqual(rt3.connection, {'G0/4': ['R2', 'G0/3'], 'G0/5': ['R1', 'G0/0']})
+
+		# Connect to interface that was connected or not exist
 		self.assertFalse(rt1.connect("G0/1", rt3, "G0/4"))
+		self.assertFalse(rt1.connect("G0/10", rt3, "G0/20"))
+
+		# Disconnect interface
+		self.assertTrue(rt1.disconnect("G0/0", rt3, "G0/5"))
+		self.assertNotIn("G0/0", rt1.connection)
+		self.assertNotIn("G0/5", rt3.connection)
+
+		self.assertDictEqual(rt1.connection, {'G0/1': ['R2', 'G0/2']})
+		self.assertDictEqual(rt3.connection, {'G0/4': ['R2', 'G0/3']})
+
+		# Disconnect the interface that not exist or not connected
+		self.assertFalse(rt1.disconnect("G0/10", rt2, "G0/2"))
+		self.assertFalse(rt3.disconnect("G0/5", rt1, "G0/0"))
+
+		del rt1, rt2, rt3
 
 
 if __name__ == '__main__':
