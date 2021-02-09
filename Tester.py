@@ -192,5 +192,7 @@ class TestRouter(unittest.TestCase):
         # Verify that the route was deleted
         self.assertNotIn("172.16.0.0/16", routingtable)
 
+        del rt1
+
 if __name__ == '__main__':
     unittest.main()
