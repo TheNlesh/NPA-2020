@@ -2,7 +2,7 @@ from termcolor import cprint
 import re
 
 class Router:
-
+""" inw netty """
     def __init__(self, brand, model, os, hostname):
         self.__brand = brand
         self.__model = model
