@@ -12,7 +12,8 @@ class Router:
 		self.connection = {}
 		self.__routing = {"default" : "not set"}
 
-	def __find_network_address(self, ip):
+	def __find_network_and_broadcast(self, ip):
+		""" find network address and broadcast address where nw = network addr, bc = broadcast addr"""
 		address, mask = ip.split("/")
 		mask = int(mask)
 		binary = ""
@@ -24,19 +25,37 @@ class Router:
 			binary += bin(number)[2:].zfill(8)
 
 		# find the network address on binary address using subnet mask
-		bin_dst = binary[:mask]
-		remainder = 32 - len(bin_dst)
-		bin_dst += '0' * remainder
+		bin_addr = binary[:mask]
+		remainder = 32 - len(bin_addr)
+		bin_nw = bin_addr + '0' * remainder
+		bin_bc = bin_addr + '1' * remainder
 
 		# Slice binary address every 8 indices for group and convert into decimal
-		dec_dst = re.findall('.' * 8, bin_dst)
+		dec_nw = re.findall('.' * 8, bin_nw)
+		dec_bc = re.findall('.' * 8, bin_bc)
 
 		# Convert binary address to decimal
-		dst = [str(int(dec, 2)) for dec in dec_dst]
+		nw = [str(int(dec, 2)) for dec in dec_nw]
+		bc = [str(int(dec, 2)) for dec in dec_bc]
 		
 		# Join list into network address by "."
-		dst = ".".join(dst) + "/" + str(32 - remainder)
-		return dst
+		nw = ".".join(nw) + "/" + str(32 - remainder)
+		bc = ".".join(bc) + "/" + str(32 - remainder)
+
+		return nw, bc
+
+	def __validateIP(self, ip, nw_addr, bc_addr):
+		checkNumber = True
+		ip, mask = ip.split("/")
+		for octet in ip.split("."):
+			if int(octet) > 255:
+				checkNumber = False
+				break
+
+		ip += "/" + str(mask)
+		if ip not in [nw_addr, bc_addr] and checkNumber and int(mask) <= 32:
+			return True
+		return False
 
 	# Hostname
 	def setHostname(self, hostname):
@@ -111,21 +130,24 @@ class Router:
 
 	# Addressing
 	def setIP(self, interfaceName, ip):
-		self.__interfaces[interfaceName] = ip
-		
-		# Add directly connected
-
-		dst = self.__find_network_address(ip)
-		self.addRoute(dst, "directly connected", interfaceName)
+		nw_address, bc_address = self.__find_network_and_broadcast(ip)
+		if interfaceName in self.__interfaces and self.__validateIP(ip, nw_address, bc_address):
+			self.__interfaces[interfaceName] = ip
+			
+			# Add directly connected
+			self.addRoute(nw_address, "directly connected", interfaceName)
+			return True
+		return False
 
 	def deleteIP(self, interfaceName):
 
 		# Delete directly connected
-		ip = self.__interfaces[interfaceName]
-		self.deleteRoute(ip)
-
-		# Delete IP address
-		self.__interfaces[interfaceName] = "unassigned IP"
+		if interfaceName in self.__interfaces and self.__interfaces[interfaceName] != "unassigned IP":
+			self.deleteRoute(self.__interfaces[interfaceName])
+			# Delete IP address
+			self.__interfaces[interfaceName] = "unassigned IP"
+			return True
+		return False
 
 	# Routing
 	def addRoute(self, dst, nexthop, iface=""):
@@ -138,8 +160,8 @@ class Router:
 		if dst == "0.0.0.0/0":
 			self.__routing["default"] = "not set"
 		else:
-			dst = self.__find_network_address(dst)
-			del self.__routing[dst]
+			nw, bc = self.__find_network_and_broadcast(dst)
+			del self.__routing[nw]
 
 	def getRoute(self):
 		return self.__routing

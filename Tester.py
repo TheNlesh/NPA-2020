@@ -115,6 +115,48 @@ class TestRouter(unittest.TestCase):
 
 		del rt1, rt2, rt3
 
+	def testAddressing(self):
+		rt1 = Router("Cisco", "c7200", "IOS", "R1")
+		rt1.addInterface("G0/0")
+		rt1.addInterface("G0/1")
+
+		# Normally IP addressing
+		self.assertTrue(rt1.setIP("G0/0", "192.168.1.1/24"))
+		self.assertEqual(rt1.getInterfaces()["G0/0"], "192.168.1.1/24")
+
+		# Addressing with Broadcast or Network address
+		self.assertFalse(rt1.setIP("G0/0", "192.168.1.0/24"))
+		self.assertFalse(rt1.setIP("G0/0", "192.168.1.255/24"))
+
+		# Addressing with invalid IP address or Subnet mask
+		self.assertFalse(rt1.setIP("G0/0", "999.999.999.999/24"))
+		self.assertFalse(rt1.setIP("G0/0", "192.168.1.1/999"))
+
+		# Addressing to the interface that doesn't exist
+		self.assertFalse(rt1.setIP("G0/5", "192.168.1.1/24"))
+
+		# check routing (Directly connected)
+		self.assertIn("192.168.1.0/24", rt1.getRoute())
+
+		# Addressing to interface that already has IP (Change IP Address)
+		self.assertTrue(rt1.setIP("G0/0", "192.168.1.10/24"))
+
+		# Check that IP was changed
+		self.assertEqual(rt1.getInterfaces()["G0/0"], "192.168.1.10/24")
+
+		# Normally delete IP address
+		self.assertTrue(rt1.deleteIP("G0/0"))
+		self.assertEqual(rt1.getInterfaces()["G0/0"], "unassigned IP")
+		self.assertNotIn("192.168.1.0/24", rt1.getRoute())
+
+		# delete IP address in the interface that doesn't have IP or doesn't exist
+		self.assertFalse(rt1.deleteIP("G0/1"))
+		self.assertFalse(rt1.deleteIP("G0/10"))
+
+		# check routing (Directly connected)
+		self.assertNotIn("192.168.1.0/24", rt1.getRoute())
+
+		del rt1
 
 if __name__ == '__main__':
 	unittest.main()
