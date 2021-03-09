@@ -318,6 +318,72 @@ class Manager:
         finally:
             connection.disconnect()
 
+    def enableCDP(self):
+        connection = self.create_connection()
+
+        if not connection:
+            return False
+
+        try:
+            connection.send_command("conf t", expect_string=r"#")
+            connection.send_command("cdp run", expect_string=r"#")
+            connection.send_command("end", expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return True
+        finally:
+            connection.disconnect()
+
+    def enableLLDP(self):
+        connection = self.create_connection()
+
+        if not connection:
+            return False
+
+        try:
+            connection.send_command("conf t", expect_string=r"#")
+            connection.send_command("lldp run", expect_string=r"#")
+            connection.send_command("end", expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return True
+        finally:
+            connection.disconnect()
+
+    def showCDP(self):
+        connection = self.create_connection()
+
+        if not connection:
+            return False
+
+        try:
+            cdp_neighbors = connection.send_command("show cdp nei", expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return cdp_neighbors
+        finally:
+            connection.disconnect()
+
+    def showLLDP(self):
+        connection = self.create_connection()
+
+        if not connection:
+            return False
+
+        try:
+            lldp_neighbors = connection.send_command("show lldp nei", expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return lldp_neighbors
+        finally:
+            connection.disconnect()
+
+
+
 def task_1(host_template, loopback_template, last_octet):
     """ Create loopback for all device """
     host = host_template + str(last_octet)
@@ -377,6 +443,19 @@ def task_5(host_template, last_octet, ospf_processID, vrf_name=""):
     print(hostname, routing_table, sep="\n")
     print("-"*50)
 
+def task_6(host_template, last_octet):
+    """ Enable CDP and LLDP on all devices """
+    host = host_template + str(last_octet)
+    manageObj = Manager(ip=host, username=username, password=password, device_type=device_type)
+    manageObj.enableCDP()
+    manageObj.enableLLDP()
+
+    hostname = manageObj.show_hostname()
+    cdp_neighbors = manageObj.showCDP()
+    lldp_neighbors = manageObj.showLLDP()
+    print(hostname, cdp_neighbors, lldp_neighbors, sep="\n")
+    print("-"*50)
+
 if __name__ == '__main__':
     # Test method
     host_template = "172.31.179."
@@ -422,12 +501,20 @@ if __name__ == '__main__':
     # for t in task4_threads:
     #     t.start()
 
-    # Task 5 OSPF configuration
-    task5_threads = []
+    # # Task 5 OSPF configuration
+    # task5_threads = []
+    # for number in range(1, 10):
+    #     thread_arg = [host_template, number, 100, "Net"]
+    #     task5_threads.append(threading.Thread(target=task_5, args=thread_arg))
+    # for t in task5_threads:
+    #     t.start()
+
+    # Task 6 enable cdp and lldp
+    task6_threads = []
     for number in range(1, 10):
-        thread_arg = [host_template, number, 100, "Net"]
-        task5_threads.append(threading.Thread(target=task_5, args=thread_arg))
-    for t in task5_threads:
+        thread_arg = [host_template, number]
+        task6_threads.append(threading.Thread(target=task_6, args=thread_arg))
+    for t in task6_threads:
         t.start()
 
 
