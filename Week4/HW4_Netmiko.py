@@ -189,7 +189,7 @@ class Manager:
         finally:
             connection.disconnect()
 
-    def add_acl_rule(self, acl_type, acl_name, action, src_nw, src_wc, rule_number=""):
+    def add_acl_rule(self, acl_type, acl_name, action, src_nw, src_wc="", rule_number=""):
         """ Add acl rule (for standard acl only) """
         connection = self.create_connection()
         if not connection:
@@ -290,6 +290,28 @@ class Manager:
         try:
             advertise_cmd = ["conf t", "router ospf {} {} {}".format(str(process_id), vrf_cmd, vrf_name),\
             "network {} {} area {}".format(network, wildcard, str(area)), "end"]
+            for cmd in advertise_cmd:
+                connection.send_command(cmd, expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return True
+        finally:
+            connection.disconnect()
+
+    def advertise_ospf_default_route(self, process_id, vrf_name=""):
+        connection = self.create_connection()
+        if vrf_name == "":
+            vrf_cmd = ""
+        else:
+            vrf_cmd = "vrf"
+
+        if not connection:
+            return False
+
+        try:
+            advertise_cmd = ["conf t", "router ospf {} {} {}".format(str(process_id), vrf_cmd, vrf_name),\
+            "default-information originate", "end"]
             for cmd in advertise_cmd:
                 connection.send_command(cmd, expect_string=r"#")
         except Exception as e:
@@ -415,6 +437,72 @@ class Manager:
         finally:
             connection.disconnect()
 
+    def addRoute(self, destination, mask, nexthop="", iface="", vrf_name=""):
+        connection = self.create_connection()
+
+        vrf_cmd = "vrf"
+        if vrf_name == "":
+            vrf_cmd = ""
+
+        if not connection:
+            return False
+
+        try:
+            route_cmd = ["conf t", "ip route {} {} {} {} {} {}".format(vrf_cmd, vrf_name, destination, mask, iface, nexthop), "end"]
+            for cmd in route_cmd:
+                connection.send_command(cmd, expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return True
+        finally:
+            connection.disconnect()
+
+
+    def enable_nat(self, interfaceName):
+        connection = self.create_connection()
+
+        if not connection:
+            return False
+
+        try:
+            nat_cmd = ["conf t", "int {}".format(interfaceName), "ip nat enable", "end"]
+            for cmd in nat_cmd:
+                connection.send_command(cmd, expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return True
+        finally:
+            connection.disconnect()
+
+    def setNat(self, acl_name, interfaceName, vrf_name="", overload=True):
+        """ NAT basic Configuration """
+        connection = self.create_connection()
+        vrf_cmd = "vrf"
+        overload = "overload"
+
+        if vrf_name == "":
+            vrf_cmd = ""
+
+        if not overload:
+            overload = ""
+
+        command = "ip nat source list {} interface {} {} {} {}".format(acl_name, interfaceName, vrf_cmd, vrf_name, overload)
+
+        if not connection:
+            return False
+
+        try:
+            nat_cmd = ["conf t", command, "end"]
+            for cmd in nat_cmd:
+                connection.send_command(cmd, expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return True
+        finally:
+            connection.disconnect()
 
 def task_1(host_template, loopback_template, last_octet):
     """ Create loopback for all device """
@@ -506,7 +594,20 @@ def task_7(host_template, last_octet):
     print(hostname, interface_cfg, sep="\n")
     print("-"*50)
 
+def task_8():
+    """ Config NAT and advertise default route on R5 """
+    manageObj = Manager(ip="172.31.179.9", username=username, password=password, device_type=device_type)
+    manageObj.create_acl(acl_type="standard", acl_name="forNAT")
+    manageObj.add_acl_rule(acl_type="standard", acl_name="forNAT", action="permit", src_nw="any")
+    manageObj.enable_nat(interfaceName="G0/1.100")
+    manageObj.enable_nat(interfaceName="G0/2")
+    manageObj.addRoute(destination="0.0.0.0", mask="0.0.0.0", nexthop="192.168.122.1", iface="G0/2", vrf_name="Net")
+    manageObj.advertise_ospf_default_route(process_id=100, vrf_name="Net")
+    manageObj.setNat(acl_name="forNAT", interfaceName="G0/2", vrf_name="Net", overload=True)
 
+    hostname = manageObj.show_hostname()
+    ifconfig = manageObj.show_interface_config()
+    print(hostname, ifconfig, sep="\n")
 
 if __name__ == '__main__':
     # Test method
@@ -569,14 +670,16 @@ if __name__ == '__main__':
     # for t in task6_threads:
     #     t.start()
 
-    # Task 7 add description based on cdp
-    task7_threads = []
-    for number in range(1, 10):
-        thread_arg = [host_template, number]
-        task7_threads.append(threading.Thread(target=task_7, args=thread_arg))
-    for t in task7_threads:
-        t.start()
+    # # Task 7 add description based on cdp
+    # task7_threads = []
+    # for number in range(1, 10):
+    #     thread_arg = [host_template, number]
+    #     task7_threads.append(threading.Thread(target=task_7, args=thread_arg))
+    # for t in task7_threads:
+    #     t.start()
 
+    # Task 8 Config NAT on R5 and advertise default route
+    task_8()
 
 
 
