@@ -173,6 +173,90 @@ class Manager:
         finally:
             connection.disconnect()
 
+    def create_acl(self, acl_type, acl_name):
+        connection = self.create_connection()
+        if not connection:
+            return False
+
+        try:
+            connection.send_command("conf t", expect_string=r"#")
+            connection.send_command("ip access-list {} {}".format(acl_type, acl_name), expect_string=r"#")
+            connection.send_command("end", expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return True
+        finally:
+            connection.disconnect()
+
+    def add_acl_rule(self, acl_type, acl_name, action, src_nw, src_wc, rule_number=""):
+        """ Add acl rule (for standard acl only) """
+        connection = self.create_connection()
+        if not connection:
+            return False
+
+        try:
+            add_rule_command = ["conf t", "ip access-list {} {}".format(acl_type, acl_name),\
+            "{} {} {} {}".format(rule_number, action, src_nw, src_wc), "end"]
+
+            for cmd in add_rule_command:
+                connection.send_command(cmd, expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return True
+        finally:
+            connection.disconnect()
+
+    def show_acl(self):
+        connection = self.create_connection()
+        if not connection:
+            return False
+
+        try:
+            acl_list = connection.send_command("show ip access", expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return acl_list
+        finally:
+            connection.disconnect()
+
+    def apply_acl_to_vty(self, vty_start, vty_end, acl_name):
+        """ Apply the acl to line vty """
+        connection = self.create_connection()
+        if not connection:
+            return False
+
+        try:
+            apply_cmd = ["conf t", "line vty {} {}".format(str(vty_start), str(vty_end)), "trans input telnet ssh",\
+            "login local", "access-class {} in vrf-also".format(acl_name), "end"]
+
+            for cmd in apply_cmd:
+                connection.send_command(cmd, expect_string=r"#")
+
+        except Exception as e:
+            return False
+        else:
+            return True
+        finally:
+            connection.disconnect()
+
+    def show_vty_config(self):
+        connection = self.create_connection()
+        if not connection:
+            return False
+
+        try:
+            vty_cfg = connection.send_command("show run | sec vty", expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return vty_cfg
+        finally:
+            connection.disconnect()
+
+
 def task_1(host_template, loopback_template, last_octet):
     """ Create loopback for all device """
     host = host_template + str(last_octet)
@@ -203,6 +287,22 @@ def task_3(host, interface_info, subif_number, vlan, vrf_name):
     print(hostname, interfaces, sep="\n")
     print("-"*50)
 
+def task_4(host_template, last_octet, acl_type, acl_name):
+    """ Create acl for allow only management IP address """
+    host = host_template + str(last_octet)
+    manageObj = Manager(ip=host, username=username, password=password, device_type=device_type)
+    manageObj.create_acl(acl_type=acl_type, acl_name=acl_name)
+    manageObj.add_acl_rule(acl_type=acl_type, acl_name=acl_name, action="permit", src_nw="172.31.179.0", src_wc="0.0.0.15")
+    manageObj.add_acl_rule(acl_type=acl_type, acl_name=acl_name, action="permit", src_nw="10.253.190.0", src_wc="0.0.0.255")
+    manageObj.apply_acl_to_vty(50, 100, acl_name)
+
+    hostname = manageObj.show_hostname()
+    vty_config = manageObj.show_vty_config()
+    acl_list = manageObj.show_acl()
+
+    print(hostname, acl_list, vty_config,sep='\n')
+    print("-"*50)
+
 if __name__ == '__main__':
     # Test method
     host_template = "172.31.179."
@@ -215,29 +315,37 @@ if __name__ == '__main__':
     # print(manageObj.save_config())
     # print(manageObj.rollback_config(interval=5))
 
-    # Task1 add loopback
-    task1_threads = []
-    for number in range(1, 10):
-        thread_arg = [host_template, loopback_template, number]
-        task1_threads.append(threading.Thread(target=task_1, args=thread_arg))
-        # task_1(host_template, loopback_template, number, username, password, device_type)
-    for t in task1_threads:
-        t.start()
+    # # Task1 add loopback
+    # task1_threads = []
+    # for number in range(1, 10):
+    #     thread_arg = [host_template, loopback_template, number]
+    #     task1_threads.append(threading.Thread(target=task_1, args=thread_arg))
+    #     # task_1(host_template, loopback_template, number, username, password, device_type)
+    # for t in task1_threads:
+    #     t.start()
 
     # Task2 completed by manual
 
     # Task3 add vrf
-    task3_threads = []
-    Routers = { "172.31.179.4" : ["G0/1 172.31.179.17 255.255.255.240", "G0/2 172.31.179.33 255.255.255.240"],
-               "172.31.179.5" : ["G0/1 172.31.179.18 255.255.255.240", "G0/2 172.31.179.149 255.255.255.240"],
-               "172.31.179.6" : ["G0/1 172.31.179.34 255.255.255.240", "G0/2 172.31.179.50 255.255.255.240", "G0/3 172.31.179.65 255.255.255.240"],
-               "172.31.179.7" : ["G0/1 172.31.179.66 255.255.255.240"],
-               "172.31.179.9" : ["G0/1 172.31.179.67 255.255.255.240"]
-    }
-    for router in Routers:
-        thread_arg = [router, Routers[router], 100, 100, "Net"]
-        task3_threads.append(threading.Thread(target=task_3, args=thread_arg))
-    for t in task3_threads:
+    # task3_threads = []
+    # Routers = { "172.31.179.4" : ["G0/1 172.31.179.17 255.255.255.240", "G0/2 172.31.179.33 255.255.255.240"],
+    #            "172.31.179.5" : ["G0/1 172.31.179.18 255.255.255.240", "G0/2 172.31.179.49 255.255.255.240"],
+    #            "172.31.179.6" : ["G0/1 172.31.179.34 255.255.255.240", "G0/2 172.31.179.50 255.255.255.240", "G0/3 172.31.179.65 255.255.255.240"],
+    #            "172.31.179.7" : ["G0/1 172.31.179.66 255.255.255.240"],
+    #            "172.31.179.9" : ["G0/1 172.31.179.67 255.255.255.240"]
+    # }
+    # for router in Routers:
+    #     thread_arg = [router, Routers[router], 100, 100, "Net"]
+    #     task3_threads.append(threading.Thread(target=task_3, args=thread_arg))
+    # for t in task3_threads:
+    #     t.start()
+
+    # Task4 ACL for Management Only
+    task4_threads = []
+    for number in range(1, 10):
+        thread_arg = [host_template, number, "standard", "AllowManagement"]
+        task4_threads.append(threading.Thread(target=task_4, args=thread_arg))
+    for t in task4_threads:
         t.start()
 
 
