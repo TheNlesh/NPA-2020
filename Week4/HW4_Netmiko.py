@@ -382,6 +382,38 @@ class Manager:
         finally:
             connection.disconnect()
 
+    def add_interface_desc(self, interfaceName, description):
+        connection = self.create_connection()
+
+        if not connection:
+            return False
+
+        try:
+            desc_cmd = ["conf t", "int {}".format(interfaceName), "desc {}".format(description), "end"]
+            for cmd in desc_cmd:
+                connection.send_command(cmd, expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return True
+        finally:
+            connection.disconnect()
+
+
+    def show_interface_config(self):
+        connection = self.create_connection()
+
+        if not connection:
+            return False
+
+        try:
+            int_cfg = connection.send_command("show run | sec int", expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return int_cfg
+        finally:
+            connection.disconnect()
 
 
 def task_1(host_template, loopback_template, last_octet):
@@ -456,6 +488,26 @@ def task_6(host_template, last_octet):
     print(hostname, cdp_neighbors, lldp_neighbors, sep="\n")
     print("-"*50)
 
+def task_7(host_template, last_octet):
+    """ Add description to the interface based on cdp information """
+    host = host_template + str(last_octet)
+    manageObj = Manager(ip=host, username=username, password=password, device_type=device_type)
+    cdp_neighbors = manageObj.showCDP()
+
+    for neighbor in cdp_neighbors.split('\n')[5:-2]:
+        remote_name = neighbor.split()[0].split('.')[0]
+        remote_int = neighbor.split()[-2] + neighbor.split()[-1]
+        local_int = neighbor.split()[1] + neighbor.split()[2]
+        description = "Connect to {} of {}".format(remote_int, remote_name)
+        manageObj.add_interface_desc(interfaceName=local_int, description=description)
+
+    hostname = manageObj.show_hostname()
+    interface_cfg = manageObj.show_interface_config()
+    print(hostname, interface_cfg, sep="\n")
+    print("-"*50)
+
+
+
 if __name__ == '__main__':
     # Test method
     host_template = "172.31.179."
@@ -509,20 +561,21 @@ if __name__ == '__main__':
     # for t in task5_threads:
     #     t.start()
 
-    # Task 6 enable cdp and lldp
-    task6_threads = []
+    # # Task 6 enable cdp and lldp
+    # task6_threads = []
+    # for number in range(1, 10):
+    #     thread_arg = [host_template, number]
+    #     task6_threads.append(threading.Thread(target=task_6, args=thread_arg))
+    # for t in task6_threads:
+    #     t.start()
+
+    # Task 7 add description based on cdp
+    task7_threads = []
     for number in range(1, 10):
         thread_arg = [host_template, number]
-        task6_threads.append(threading.Thread(target=task_6, args=thread_arg))
-    for t in task6_threads:
+        task7_threads.append(threading.Thread(target=task_7, args=thread_arg))
+    for t in task7_threads:
         t.start()
-
-
-
-
-
-
-
 
 
 
