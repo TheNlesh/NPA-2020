@@ -140,6 +140,25 @@ class Manager:
         finally:
             connection.disconnect()
 
+    def create_subinterface(self, interface, subif_number, ip, mask, vlan, vrf_name):
+        connection = self.create_connection()
+        if not connection:
+            return False
+
+        try:
+            interface_command = ["conf t", "int {}.{}".format(interface, subif_number), "encap dot1Q {}".format(vlan),\
+            "ip vrf forward {}".format(vrf_name), "ip add {} {}".format(ip, mask), "int {}".format(interface), "no shut", "end"]
+
+            for cmd in interface_command:
+                connection.send_command(cmd, expect_string=r"#")
+
+        except Exception as e:
+            return False
+        else:
+            return True
+        finally:
+            connection.disconnect()
+
     def show_interface(self):
         connection = self.create_connection()
         if not connection:
@@ -154,7 +173,7 @@ class Manager:
         finally:
             connection.disconnect()
 
-def task_1(host_template, loopback_template, last_octet, username, password, device_type):
+def task_1(host_template, loopback_template, last_octet):
     """ Create loopback for all device """
     host = host_template + str(last_octet)
     loopback_ip = loopback_template + str(last_octet)
@@ -168,6 +187,21 @@ def task_1(host_template, loopback_template, last_octet, username, password, dev
     print(hostname, interfaces, sep="\n")
     print("-"*50)
 
+def task_3(host, interface_info, subif_number, vlan, vrf_name):
+    """ Apply vrf to the interface for sepertate management and data traffic """
+    manageObj = Manager(ip=host, username=username, password=password, device_type=device_type)
+    for iface in interface_info:
+        interface = iface.split()
+        interfaceName = interface[0]
+        interface_ip = interface[1]
+        interface_subnetmask = interface[2]
+
+        manageObj.create_subinterface(interface=interfaceName, subif_number=subif_number, ip=interface_ip, mask=interface_subnetmask, vlan=vlan, vrf_name=vrf_name)
+
+    hostname = manageObj.show_hostname()
+    interfaces = manageObj.show_interface()
+    print(hostname, interfaces, sep="\n")
+    print("-"*50)
 
 if __name__ == '__main__':
     # Test method
@@ -184,10 +218,26 @@ if __name__ == '__main__':
     # Task1 add loopback
     task1_threads = []
     for number in range(1, 10):
-        thread_arg = [host_template, loopback_template, number, username, password, device_type]
+        thread_arg = [host_template, loopback_template, number]
         task1_threads.append(threading.Thread(target=task_1, args=thread_arg))
         # task_1(host_template, loopback_template, number, username, password, device_type)
     for t in task1_threads:
+        t.start()
+
+    # Task2 completed by manual
+
+    # Task3 add vrf
+    task3_threads = []
+    Routers = { "172.31.179.4" : ["G0/1 172.31.179.17 255.255.255.240", "G0/2 172.31.179.33 255.255.255.240"],
+               "172.31.179.5" : ["G0/1 172.31.179.18 255.255.255.240", "G0/2 172.31.179.149 255.255.255.240"],
+               "172.31.179.6" : ["G0/1 172.31.179.34 255.255.255.240", "G0/2 172.31.179.50 255.255.255.240", "G0/3 172.31.179.65 255.255.255.240"],
+               "172.31.179.7" : ["G0/1 172.31.179.66 255.255.255.240"],
+               "172.31.179.9" : ["G0/1 172.31.179.67 255.255.255.240"]
+    }
+    for router in Routers:
+        thread_arg = [router, Routers[router], 100, 100, "Net"]
+        task3_threads.append(threading.Thread(target=task_3, args=thread_arg))
+    for t in task3_threads:
         t.start()
 
 
