@@ -256,6 +256,67 @@ class Manager:
         finally:
             connection.disconnect()
 
+    def create_ospf_process(self, process_id, vrf_name=""):
+        connection = self.create_connection()
+        if vrf_name == "":
+            vrf_cmd = ""
+        else:
+            vrf_cmd = "vrf"
+
+        if not connection:
+            return False
+
+        try:
+            ospf_cmd = ["conf t", "router ospf {} {} {}".format(str(process_id), vrf_cmd, vrf_name), "end"]
+            for cmd in ospf_cmd:
+                connection.send_command(cmd, expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return True
+        finally:
+            connection.disconnect()
+
+    def advertise_ospf_network(self, process_id, network, wildcard, area, vrf_name=""):
+        connection = self.create_connection()
+        if vrf_name == "":
+            vrf_cmd = ""
+        else:
+            vrf_cmd = "vrf"
+
+        if not connection:
+            return False
+
+        try:
+            advertise_cmd = ["conf t", "router ospf {} {} {}".format(str(process_id), vrf_cmd, vrf_name),\
+            "network {} {} area {}".format(network, wildcard, str(area)), "end"]
+            for cmd in advertise_cmd:
+                connection.send_command(cmd, expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return True
+        finally:
+            connection.disconnect()
+
+    def show_routing_table(self, vrf_name=""):
+        connection = self.create_connection()
+        if vrf_name == "":
+            vrf_cmd = ""
+        else:
+            vrf_cmd = "vrf"
+
+        if not connection:
+            return False
+
+        try:
+            routing_table = connection.send_command("sh ip route {} {}".format(vrf_cmd, vrf_name), expect_string=r"#")
+        except Exception as e:
+            return False
+        else:
+            return routing_table
+        finally:
+            connection.disconnect()
 
 def task_1(host_template, loopback_template, last_octet):
     """ Create loopback for all device """
@@ -300,7 +361,20 @@ def task_4(host_template, last_octet, acl_type, acl_name):
     vty_config = manageObj.show_vty_config()
     acl_list = manageObj.show_acl()
 
-    print(hostname, acl_list, vty_config,sep='\n')
+    print(hostname, acl_list, vty_config,sep="\n")
+    print("-"*50)
+
+def task_5(host_template, last_octet, ospf_processID, vrf_name=""):
+    """ Config OSPF to all device """
+    host = host_template + str(last_octet)
+    manageObj = Manager(ip=host, username=username, password=password, device_type=device_type)
+    manageObj.create_ospf_process(process_id=ospf_processID, vrf_name="Net")
+    manageObj.advertise_ospf_network(process_id=ospf_processID, network="172.31.179.0", wildcard="0.0.0.255", area=0, vrf_name="Net")
+    manageObj.advertise_ospf_network(process_id=ospf_processID, network="172.20.179.0", wildcard="0.0.0.255", area=0, vrf_name="Net")
+
+    hostname = manageObj.show_hostname()
+    routing_table = manageObj.show_routing_table()
+    print(hostname, routing_table, sep="\n")
     print("-"*50)
 
 if __name__ == '__main__':
@@ -324,9 +398,9 @@ if __name__ == '__main__':
     # for t in task1_threads:
     #     t.start()
 
-    # Task2 completed by manual
+    # # Task2 completed by manual
 
-    # Task3 add vrf
+    # # Task3 add vrf
     # task3_threads = []
     # Routers = { "172.31.179.4" : ["G0/1 172.31.179.17 255.255.255.240", "G0/2 172.31.179.33 255.255.255.240"],
     #            "172.31.179.5" : ["G0/1 172.31.179.18 255.255.255.240", "G0/2 172.31.179.49 255.255.255.240"],
@@ -340,13 +414,32 @@ if __name__ == '__main__':
     # for t in task3_threads:
     #     t.start()
 
-    # Task4 ACL for Management Only
-    task4_threads = []
+    # # Task4 ACL for Management Only
+    # task4_threads = []
+    # for number in range(1, 10):
+    #     thread_arg = [host_template, number, "standard", "AllowManagement"]
+    #     task4_threads.append(threading.Thread(target=task_4, args=thread_arg))
+    # for t in task4_threads:
+    #     t.start()
+
+    # Task 5 OSPF configuration
+    task5_threads = []
     for number in range(1, 10):
-        thread_arg = [host_template, number, "standard", "AllowManagement"]
-        task4_threads.append(threading.Thread(target=task_4, args=thread_arg))
-    for t in task4_threads:
+        thread_arg = [host_template, number, 100, "Net"]
+        task5_threads.append(threading.Thread(target=task_5, args=thread_arg))
+    for t in task5_threads:
         t.start()
+
+
+
+
+
+
+
+
+
+
+
 
 
 
