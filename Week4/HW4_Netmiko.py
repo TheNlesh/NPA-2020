@@ -678,8 +678,8 @@ if __name__ == '__main__':
     # for t in task7_threads:
     #     t.start()
 
-    # Task 8 Config NAT on R5 and advertise default route
-    task_8()
+    # # Task 8 Config NAT on R5 and advertise default route
+    # task_8()
 
 
 
